@@ -1,0 +1,595 @@
+--- a/clang/include/clang/Parse/Parser.h
++++ b/clang/include/clang/Parse/Parser.h
+@@ -7098,6 +7098,7 @@
+   ///@{
+ 
+ private:
++  std::unique_ptr<PragmaHandler> OverflowCheckHandler;
+   std::unique_ptr<PragmaHandler> AlignHandler;
+   std::unique_ptr<PragmaHandler> GCCVisibilityHandler;
+   std::unique_ptr<PragmaHandler> OptionsHandler;
+@@ -7154,6 +7155,9 @@
+   /// Destroy and reset all pragma handlers.
+   void resetPragmaHandlers();
+ 
++  /// Consume the annotation for #pragma overflowCheck.
++  void HandlePragmaOverflowCheck();
++
+   /// Handle the annotation token produced for #pragma unused(...)
+   ///
+   /// Each annot_pragma_unused is followed by the argument token so e.g.
+--- a/clang/lib/Parse/ParsePragma.cpp
++++ b/clang/lib/Parse/ParsePragma.cpp
+@@ -32,6 +32,32 @@
+ 
+ namespace {
+ 
++struct PragmaOverflowCheckHandler : public PragmaHandler {
++  PragmaOverflowCheckHandler() : PragmaHandler("overflowCheck") {}
++  void HandlePragma(Preprocessor &PP, PragmaIntroducer,
++                    Token &FirstToken) override {
++    // Consume the directive's end before reinjecting its annotation.
++    Token Tok;
++    PP.Lex(Tok);
++    if (Tok.isNot(tok::eod)) {
++      PP.Diag(Tok.getLocation(), diag::warn_pragma_extra_tokens_at_eol)
++          << "overflowCheck";
++      PP.DiscardUntilEndOfDirective();
++      return;
++    }
++
++    MutableArrayRef<Token> Toks(
++        PP.getPreprocessorAllocator().Allocate<Token>(1), 1);
++    Toks[0].startToken();
++    Toks[0].setKind(tok::annot_pragma_overflowcheck);
++    Toks[0].setLocation(FirstToken.getLocation());
++    Toks[0].setAnnotationEndLoc(FirstToken.getLocation());
++    Toks[0].setAnnotationValue(nullptr);
++    PP.EnterTokenStream(Toks, /*DisableMacroExpansion=*/true,
++                        /*IsReinject=*/false);
++  }
++};
++
+ struct PragmaAlignHandler : public PragmaHandler {
+   explicit PragmaAlignHandler() : PragmaHandler("align") {}
+   void HandlePragma(Preprocessor &PP, PragmaIntroducer Introducer,
+@@ -420,6 +446,9 @@
+ }  // end namespace
+ 
+ void Parser::initializePragmaHandlers() {
++  OverflowCheckHandler = std::make_unique<PragmaOverflowCheckHandler>();
++  PP.AddPragmaHandler(OverflowCheckHandler.get());
++
+   AlignHandler = std::make_unique<PragmaAlignHandler>();
+   PP.AddPragmaHandler(AlignHandler.get());
+ 
+@@ -579,6 +608,9 @@
+ }
+ 
+ void Parser::resetPragmaHandlers() {
++  PP.RemovePragmaHandler(OverflowCheckHandler.get());
++  OverflowCheckHandler.reset();
++
+   // Remove the pragma handlers we installed.
+   PP.RemovePragmaHandler(AlignHandler.get());
+   AlignHandler.reset();
+--- a/clang/include/clang/Basic/TokenKinds.def
++++ b/clang/include/clang/Basic/TokenKinds.def
+@@ -764,6 +764,9 @@
+ // one 'pragma_unused' annotation token followed by the argument token.
+ PRAGMA_ANNOTATION(pragma_unused)
+ 
++// Annotation for #pragma overflowCheck.
++PRAGMA_ANNOTATION(pragma_overflowcheck)
++
+ // Annotation for #pragma GCC visibility...
+ // The lexer produces these so that they only take effect when the parser
+ // handles them.
+--- a/clang/lib/Parse/Parser.cpp
++++ b/clang/lib/Parse/Parser.cpp
+@@ -725,6 +725,12 @@
+   return false;
+ }
+ 
++void Parser::HandlePragmaOverflowCheck() {
++  assert(Tok.is(tok::annot_pragma_overflowcheck));
++  Actions.ActOnPragmaOverFlowCheck();
++  ConsumeAnnotationToken();
++}
++
+ Parser::DeclGroupPtrTy
+ Parser::ParseExternalDeclaration(ParsedAttributes &Attrs,
+                                  ParsedAttributes &DeclSpecAttrs,
+@@ -739,6 +745,9 @@
+ 
+   Decl *SingleDecl = nullptr;
+   switch (Tok.getKind()) {
++  case tok::annot_pragma_overflowcheck:
++    HandlePragmaOverflowCheck();
++    return nullptr;
+   case tok::annot_pragma_vis:
+     HandlePragmaVisibility();
+     return nullptr;
+--- a/clang/include/clang/Sema/Sema.h
++++ b/clang/include/clang/Sema/Sema.h
+@@ -2160,6 +2160,11 @@
+   /// (i.e. `ModifyFnAttributeMSPragmaOptimze()` does nothing)
+   bool MSPragmaOptimizeIsOn = true;
+ 
++  /// A pending overflowCheck pragma is consumed by a function definition.
++  bool OverflowCheckPragmaOn = false;
++
++  void ActOnPragmaOverFlowCheck();
++
+   /// Set of no-builtin functions listed by \#pragma function.
+   llvm::SmallSetVector<StringRef, 4> MSFunctionNoBuiltins;
+ 
+--- a/clang/lib/Sema/SemaAttr.cpp
++++ b/clang/lib/Sema/SemaAttr.cpp
+@@ -21,6 +21,10 @@
+ #include "clang/Sema/Lookup.h"
+ #include <optional>
+ using namespace clang;
++
++void Sema::ActOnPragmaOverFlowCheck() {
++  OverflowCheckPragmaOn = true;
++}
+ 
+ //===----------------------------------------------------------------------===//
+ // Pragma 'pack' and 'options align'
+--- a/clang/lib/Sema/SemaDecl.cpp
++++ b/clang/lib/Sema/SemaDecl.cpp
+@@ -16829,6 +16829,11 @@
+   FunctionScopeInfo *FSI = getCurFunction();
+   FunctionDecl *FD = dcl ? dcl->getAsFunction() : nullptr;
+ 
++  if (FD && !IsInstantiation) {
++    FD->setOverflowCheck(OverflowCheckPragmaOn);
++    OverflowCheckPragmaOn = false;
++  }
++
+   if (FSI->UsesFPIntrin && FD && !FD->hasAttr<StrictFPAttr>())
+     FD->addAttr(StrictFPAttr::CreateImplicit(Context));
+ 
+--- a/clang/include/clang/AST/Decl.h
++++ b/clang/include/clang/AST/Decl.h
+@@ -2184,6 +2184,9 @@
+ 
+   unsigned ODRHash;
+ 
++  /// Whether this definition is selected by #pragma overflowCheck.
++  bool IsOverflowCheck = false;
++
+   /// End part of this FunctionDecl's source range.
+   ///
+   /// We could compute the full range in getSourceRange(). However, when we're
+@@ -2288,6 +2291,9 @@
+ public:
+   friend class ASTDeclReader;
+   friend class ASTDeclWriter;
++
++  void setOverflowCheck(bool Flag) { IsOverflowCheck = Flag; }
++  bool getOverflowCheck() const { return IsOverflowCheck; }
+ 
+   using redecl_range = redeclarable_base::redecl_range;
+   using redecl_iterator = redeclarable_base::redecl_iterator;
+--- a/clang/examples/CMakeLists.txt
++++ b/clang/examples/CMakeLists.txt
+@@ -6,6 +6,7 @@
+ if(CLANG_PLUGIN_SUPPORT)
+   add_subdirectory(LLVMPrintFunctionNames)
+   add_subdirectory(PrintFunctionNames)
++  add_subdirectory(TraverseFunctionDecls)
+   add_subdirectory(AnnotateFunctions)
+   add_subdirectory(Attribute)
+   add_subdirectory(CallSuperAttribute)
+--- /dev/null
++++ b/clang/examples/TraverseFunctionDecls/CMakeLists.txt
+@@ -0,0 +1,4 @@
++add_llvm_library(TraverseFunctionDecls MODULE
++  TraverseFunctionDecls.cpp
++  PLUGIN_TOOL clang
++)
+--- /dev/null
++++ b/clang/examples/TraverseFunctionDecls/TraverseFunctionDecls.cpp
+@@ -0,0 +1,60 @@
++//===- TraverseFunctionDecls.cpp - PR001 function pragma report ------------===//
++// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
++
++#include "clang/AST/ASTConsumer.h"
++#include "clang/AST/RecursiveASTVisitor.h"
++#include "clang/Frontend/CompilerInstance.h"
++#include "clang/Frontend/FrontendPluginRegistry.h"
++#include "llvm/Support/raw_ostream.h"
++#include <map>
++#include <memory>
++#include <string>
++#include <vector>
++
++using namespace clang;
++
++namespace {
++class TraverseFunctionDeclsVisitor
++    : public RecursiveASTVisitor<TraverseFunctionDeclsVisitor> {
++  std::map<std::string, unsigned> FunctionRules;
++
++public:
++  bool VisitFunctionDecl(FunctionDecl *FD) {
++    unsigned Rule = FD->getOverflowCheck();
++    // A later prototype must not erase the flag recorded on the definition.
++    FunctionRules[FD->getNameAsString()] |= Rule;
++    return true;
++  }
++
++  void OutputAsCheckRules() const {
++    for (const auto &Entry : FunctionRules)
++      llvm::outs() << Entry.first << ": " << Entry.second << "\n";
++  }
++};
++
++class TraverseFunctionDeclsConsumer : public ASTConsumer {
++  TraverseFunctionDeclsVisitor Visitor;
++
++public:
++  void HandleTranslationUnit(ASTContext &Context) override {
++    Visitor.TraverseDecl(Context.getTranslationUnitDecl());
++    Visitor.OutputAsCheckRules();
++  }
++};
++
++class TraverseFunctionDeclsAction : public PluginASTAction {
++protected:
++  std::unique_ptr<ASTConsumer>
++  CreateASTConsumer(CompilerInstance &, llvm::StringRef) override {
++    return std::make_unique<TraverseFunctionDeclsConsumer>();
++  }
++
++  bool ParseArgs(const CompilerInstance &,
++                 const std::vector<std::string> &) override {
++    return true;
++  }
++};
++} // namespace
++
++static FrontendPluginRegistry::Add<TraverseFunctionDeclsAction>
++    X("traverse-fn-decls", "print whether each function is under overflowCheck");
+--- /dev/null
++++ b/pr001-tests/verify.py
+@@ -0,0 +1,252 @@
++#!/usr/bin/env python3
++"""Exercise PR001 through the rebuilt Clang and its actual AST plugin."""
++
++import argparse
++import json
++from pathlib import Path
++import subprocess
++import tempfile
++import textwrap
++
++
++CASES = [
++    ('no-pragma', 'int foo1(void) { return 0; }', {'foo1': 0}),
++    ('single-definition', '''
++        #pragma overflowCheck
++        int foo1(void) { return 0; }
++        int foo2(void) { return 0; }
++    ''', {'foo1': 1, 'foo2': 0}),
++    ('declaration-does-not-consume', '''
++        #pragma overflowCheck
++        int foo1(void);
++        int foo2(void) { return 0; }
++        int foo3(void) { return 0; }
++    ''', {'foo1': 0, 'foo2': 1, 'foo3': 0}),
++    ('prototype-and-definition', '''
++        #pragma overflowCheck
++        int foo1(void);
++        int foo1(void);
++        int foo1(void) { return 0; }
++        int foo2(void) { return 0; }
++    ''', {'foo1': 1, 'foo2': 0}),
++    ('intervening-declarations', '''
++        #pragma overflowCheck
++        int prototype(void);
++        typedef int Number;
++        struct Record { int field; };
++        union Value { int i; char c; };
++        enum Color { RED, BLUE };
++        int global;
++        int (*callback)(void);
++        _Static_assert(sizeof(Number) == sizeof(int), "int size");
++        int selected(void) { return 1; }
++        int next(void) { return 2; }
++    ''', {'prototype': 0, 'selected': 1, 'next': 0}),
++    ('independent-pragmas', '''
++        #pragma overflowCheck
++        int a(void) { return 0; }
++        int b(void) { return 0; }
++        #pragma overflowCheck
++        int c(void) { return 0; }
++        int d(void) { return 0; }
++    ''', {'a': 1, 'b': 0, 'c': 1, 'd': 0}),
++    ('consecutive-pragmas', '''
++        #pragma overflowCheck
++        #pragma overflowCheck
++        int selected(void) { return 0; }
++        int next(void) { return 0; }
++    ''', {'selected': 1, 'next': 0}),
++    ('pragma-at-eof-no-newline', '#pragma overflowCheck', {}),
++    ('pragma-at-eof-after-definition', '''
++        int earlier(void) { return 0; }
++        #pragma overflowCheck
++    ''', {'earlier': 0}),
++    ('trailing-comment-and-blank-lines', '''
++        #pragma overflowCheck // comment
++
++        /* another comment */
++        int selected(void) { return 0; }
++        int next(void) { return 0; }
++    ''', {'selected': 1, 'next': 0}),
++    ('multiline-comment', '''
++        #pragma overflowCheck /* comment
++                                  continued */
++        int selected(void) { return 0; }
++    ''', {'selected': 1}),
++    ('invalid-extra-tokens', '''
++        #pragma overflowCheck unexpected tokens
++        int first(void) { return 0; }
++        int next(void) { return 0; }
++    ''', {'first': 0, 'next': 0}),
++    ('case-sensitive', '''
++        #pragma overflowcheck
++        int plain(void) { return 0; }
++    ''', {'plain': 0}),
++    ('same-name-macro', '''
++        #define overflowCheck another_name
++        #pragma overflowCheck
++        int selected(void) { return 0; }
++        int next(void) { return 0; }
++    ''', {'selected': 1, 'next': 0}),
++    ('pragma-operator', '''
++        _Pragma("overflowCheck")
++        int selected(void) { return 0; }
++        int next(void) { return 0; }
++    ''', {'selected': 1, 'next': 0}),
++    ('macro-pragma-operator', '''
++        #define SELECT_NEXT _Pragma("overflowCheck")
++        SELECT_NEXT
++        int selected(void) { return 0; }
++        int next(void) { return 0; }
++    ''', {'selected': 1, 'next': 0}),
++    ('inactive-directive', '''
++        #if 0
++        #pragma overflowCheck
++        #endif
++        int plain(void) { return 0; }
++    ''', {'plain': 0}),
++    ('later-prototype-preserves-definition', '''
++        #pragma overflowCheck
++        int selected(void) { return 0; }
++        int selected(void);
++        int selected(void);
++        int next(void) { return 0; }
++    ''', {'selected': 1, 'next': 0}),
++    ('prototype-must-not-mark-earlier-definition', '''
++        int earlier(void) { return 0; }
++        #pragma overflowCheck
++        int earlier(void);
++        int selected(void) { return 0; }
++        int next(void) { return 0; }
++    ''', {'earlier': 0, 'selected': 1, 'next': 0}),
++    ('function-pointer-prototype', '''
++        #pragma overflowCheck
++        int (*factory(void))(void);
++        int selected(int (*callback)(void)) { return callback(); }
++        int next(void) { return 0; }
++    ''', {'factory': 0, 'selected': 1, 'next': 0}),
++    ('static-inline-definition', '''
++        #pragma overflowCheck
++        static inline int selected(void) { return 0; }
++        int next(void) { return selected(); }
++    ''', {'selected': 1, 'next': 0}),
++    ('empty-declarations', '''
++        #pragma overflowCheck
++        ; ;
++        int prototype(void);
++        ;
++        int selected(void) { return 0; }
++        int next(void) { return 0; }
++    ''', {'prototype': 0, 'selected': 1, 'next': 0}),
++    ('existing-pack-pragma', '''
++        #pragma overflowCheck
++        #pragma pack(push, 1)
++        struct Packed { char c; int value; };
++        #pragma pack(pop)
++        _Static_assert(sizeof(struct Packed) == 5, "pack preserved");
++        int selected(void) { return 0; }
++        int next(void) { return 0; }
++    ''', {'selected': 1, 'next': 0}),
++    ('other-pragmas-do-not-consume', '''
++        #pragma overflowCheck
++        #pragma GCC diagnostic push
++        #pragma GCC diagnostic ignored "-Wunused-function"
++        int selected(void) { return 0; }
++        #pragma GCC diagnostic pop
++        int next(void) { return 0; }
++    ''', {'selected': 1, 'next': 0}),
++    ('include-prototype', '''
++        #pragma overflowCheck
++        #include "prototype.h"
++        int selected(void) { return 0; }
++        int next(void) { return 0; }
++    ''', {'header_decl': 0, 'selected': 1, 'next': 0}),
++    ('include-definition', '''
++        #pragma overflowCheck
++        #include "definition.h"
++        int next(void) { return 0; }
++    ''', {'header_definition': 1, 'next': 0}),
++    ('pragma-from-include', '''
++        #include "selection.h"
++        int selected(void) { return 0; }
++        int next(void) { return 0; }
++    ''', {'header_decl': 0, 'selected': 1, 'next': 0}),
++    ('declaration-only-at-eof', '''
++        #pragma overflowCheck
++        int only_declared(void);
++    ''', {'only_declared': 0}),
++    ('empty-translation-unit', '', {}),
++]
++
++
++def main():
++    parser = argparse.ArgumentParser(description=__doc__)
++    parser.add_argument('--clang', type=Path, required=True)
++    parser.add_argument('--plugin', type=Path, required=True)
++    parser.add_argument('--work-dir', type=Path)
++    args = parser.parse_args()
++    clang = args.clang.resolve()
++    plugin = args.plugin.resolve()
++    root = (args.work_dir or Path(tempfile.mkdtemp(prefix='pr001-tests-'))).resolve()
++    root.mkdir(parents=True, exist_ok=True)
++    results = []
++
++    def run(name, command, predicate, expected=None):
++        try:
++            p = subprocess.run([str(x) for x in command], capture_output=True,
++                               text=True, timeout=120)
++            (root / (name + '.stdout')).write_text(p.stdout)
++            (root / (name + '.stderr')).write_text(p.stderr)
++            ok = p.returncode == 0 and predicate(p)
++            result = {'name': name, 'command': [str(x) for x in command],
++                      'exit_code': p.returncode, 'status': 'PASS' if ok else 'FAIL'}
++        except (OSError, subprocess.TimeoutExpired) as exc:
++            result = {'name': name, 'command': [str(x) for x in command],
++                      'status': 'FAIL', 'error': str(exc)}
++        if expected is not None:
++            result['expected_stdout'] = expected
++        results.append(result)
++        (root / 'results.json').write_text(json.dumps(results, indent=2) + '\n')
++        print(name + ': ' + result['status'], flush=True)
++
++    (root / 'prototype.h').write_text('int header_decl(void);\n')
++    (root / 'definition.h').write_text('int header_definition(void) { return 0; }\n')
++    (root / 'selection.h').write_text('#pragma overflowCheck\nint header_decl(void);\n')
++    run('clang-version', [clang, '--version'], lambda p: 'clang version' in p.stdout)
++
++    for name, source, expected in CASES:
++        path = root / (name + '.c')
++        path.write_text(textwrap.dedent(source).lstrip())
++        output = ''.join(f'{key}: {expected[key]}\n' for key in sorted(expected))
++        command = [clang, '-std=c11', '-Xclang', '-load', '-Xclang', plugin,
++                   '-Xclang', '-plugin', '-Xclang', 'traverse-fn-decls',
++                   '-fsyntax-only', path]
++        run(name, command,
++            lambda p, output=output, name=name:
++                p.stdout == output and
++                (name != 'invalid-extra-tokens' or 'extra tokens' in p.stderr),
++            output)
++
++    marked = root / 'single-definition.c'
++    run('normal-pragma-syntax', [clang, '-std=c11', '-fsyntax-only', marked],
++        lambda p: not p.stderr)
++    run('ordinary-ast-with-pragma',
++        [clang, '-std=c11', '-Xclang', '-ast-dump', '-fsyntax-only', marked],
++        lambda p: 'FunctionDecl' in p.stdout and 'ReturnStmt' in p.stdout)
++    obj = root / 'pragma.o'
++    run('normal-pragma-code-generation', [clang, '-std=c11', '-c', marked, '-o', obj],
++        lambda p: obj.is_file() and obj.stat().st_size > 0)
++
++    counts = {status: sum(r['status'] == status for r in results)
++              for status in ['PASS', 'FAIL']}
++    summary = {'overall': 'PASS' if counts['FAIL'] == 0 else 'FAIL',
++               'counts': counts, 'clang': str(clang), 'plugin': str(plugin),
++               'results': results}
++    (root / 'verification-result.json').write_text(json.dumps(summary, indent=2) + '\n')
++    print(json.dumps({'overall': summary['overall'], 'counts': counts,
++                      'records': str(root)}), flush=True)
++    return 0 if counts['FAIL'] == 0 else 1
++
++
++if __name__ == '__main__':
++    raise SystemExit(main())
+--- /dev/null
++++ b/pr001-tests/example.c
+@@ -0,0 +1,10 @@
++int foo0(void) { return 0; }
++
++#pragma overflowCheck
++int foo1(void);
++int global;
++int foo2(void) { return 0; }
++int foo3(void) { return 0; }
++
++/* A later declaration must preserve foo2's recorded result. */
++int foo2(void);
+--- /dev/null
++++ b/README-PR001.md
+@@ -0,0 +1,69 @@
++# PR001 LLVM 实验源码
++
++本目录包含完整 LLVM/Clang 源码及 PR001 第 7.1–7.4 节的实现。实验功能是在 AST 中记录 `#pragma overflowCheck` 对应的函数，并通过 `traverse-fn-decls` 插件打印 `函数名: 0/1`。
++
++恢复基线为 LLVM 官方版本 `33ec67a140529cd1ae204e231dc718788c1bc95d`（Clang 24.0.0git）。本实验涉及的三个原始词法/Parser 文件与原工程的 Mac 基线备份逐字节一致。平台重置后，使用该兼容基线恢复完整工程，再补回保存的修改。原课程插件模板随服务器环境丢失，已按指导书恢复插件框架，并接入真实属性读取。
++
++## 在 Linux 构建
++
++进入本目录后执行：
++
++```sh
++cmake -S llvm -B build -G "Unix Makefiles" \
++  -DCMAKE_BUILD_TYPE=Release \
++  -DLLVM_ENABLE_PROJECTS=clang \
++  -DLLVM_TARGETS_TO_BUILD=X86 \
++  -DLLVM_BUILD_EXAMPLES=ON \
++  -DCLANG_BUILD_EXAMPLES=ON \
++  -DLLVM_ENABLE_ASSERTIONS=ON \
++  -DLLVM_ENABLE_RTTI=OFF \
++  -DLLVM_ENABLE_EH=OFF
++cmake --build build --target clang TraverseFunctionDecls -- -j2
++```
++
++已有工程请先备份，并沿用兼容的构建缓存；本轮服务器原缓存已随平台环境丢失。不要直接用其他 Clang 版本加载该插件，编译器和插件需要使用同一份修改后的头文件重新构建。
++
++## 查看真实 0/1 输出
++
++```sh
++build/bin/clang -Xclang -load \
++  -Xclang build/lib/TraverseFunctionDecls.so \
++  -Xclang -plugin -Xclang traverse-fn-decls \
++  -fsyntax-only pr001-tests/example.c
++```
++
++预期输出：
++
++```text
++foo0: 0
++foo1: 0
++foo2: 1
++foo3: 0
++```
++
++`foo1` 只有声明，不消耗制导；`foo2` 是最近的函数定义；后续 `foo3` 不继承状态。`foo2` 定义后又出现的声明也不会把插件输出重置为 0。连续制导仍只选择最近的一个定义。
++
++## 运行回归验证
++
++```sh
++python3 pr001-tests/verify.py \
++  --clang build/bin/clang \
++  --plugin build/lib/TraverseFunctionDecls.so \
++  --work-dir /tmp/pr001-full-lab-tests
++```
++
++脚本实际加载插件，并逐例核对完整输出。它同时保存命令、退出码、标准输出、诊断和 `verification-result.json`，覆盖声明、定义、间隔声明、重复声明、连续制导、注释、宏、头文件、现有 pack pragma、普通 AST 和目标代码生成。
++
++## 实现位置
++
++- `clang/include/clang/Basic/TokenKinds.def`：pragma annotation 类型。
++- `clang/lib/Parse/ParsePragma.cpp`：处理 pragma、消费指令行、构造并重新注入 annotation，注册与反注册 Handler。
++- `clang/include/clang/Parse/Parser.h`、`clang/lib/Parse/Parser.cpp`：Handler 所有权和 annotation 消费入口。
++- `clang/include/clang/Sema/Sema.h`、`clang/lib/Sema/SemaAttr.cpp`：初始化明确的待匹配状态和激活方法。
++- `clang/lib/Sema/SemaDecl.cpp`：在函数定义完成时记录属性并清除状态，声明不走此入口。
++- `clang/include/clang/AST/Decl.h`：默认 false 的属性和 public get/set 接口。
++- `clang/examples/TraverseFunctionDecls/`、`clang/examples/CMakeLists.txt`：插件及构建接入。
++
++Parser 使用当前版本的 `ConsumeAnnotationToken()` 消费 annotation；这与指导书的消费意图一致，并保留 annotation 的源码结束位置。所有现有通用 Lexer/Preprocessor 分派函数保持原实现。
++
++本轮按用户后续指示优先完成全部实验代码；额外 Debug 构建、安装及 VSCode F5 环境验收暂缓。没有建立 Git 提交，也没有推送 GitLab。

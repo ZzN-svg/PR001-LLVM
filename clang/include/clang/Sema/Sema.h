@@ -2160,6 +2160,11 @@ public:
   /// (i.e. `ModifyFnAttributeMSPragmaOptimze()` does nothing)
   bool MSPragmaOptimizeIsOn = true;
 
+  /// A pending overflowCheck pragma is consumed by a function definition.
+  bool OverflowCheckPragmaOn = false;
+
+  void ActOnPragmaOverFlowCheck();
+
   /// Set of no-builtin functions listed by \#pragma function.
   llvm::SmallSetVector<StringRef, 4> MSFunctionNoBuiltins;
 

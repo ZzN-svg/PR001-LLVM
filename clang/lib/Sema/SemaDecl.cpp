@@ -16829,6 +16829,11 @@ Decl *Sema::ActOnFinishFunctionBody(Decl *dcl, Stmt *Body, bool IsInstantiation,
   FunctionScopeInfo *FSI = getCurFunction();
   FunctionDecl *FD = dcl ? dcl->getAsFunction() : nullptr;
 
+  if (FD && !IsInstantiation) {
+    FD->setOverflowCheck(OverflowCheckPragmaOn);
+    OverflowCheckPragmaOn = false;
+  }
+
   if (FSI->UsesFPIntrin && FD && !FD->hasAttr<StrictFPAttr>())
     FD->addAttr(StrictFPAttr::CreateImplicit(Context));
 

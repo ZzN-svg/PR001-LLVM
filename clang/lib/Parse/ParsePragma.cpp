@@ -32,6 +32,32 @@ using namespace clang;
 
 namespace {
 
+struct PragmaOverflowCheckHandler : public PragmaHandler {
+  PragmaOverflowCheckHandler() : PragmaHandler("overflowCheck") {}
+  void HandlePragma(Preprocessor &PP, PragmaIntroducer,
+                    Token &FirstToken) override {
+    // Consume the directive's end before reinjecting its annotation.
+    Token Tok;
+    PP.Lex(Tok);
+    if (Tok.isNot(tok::eod)) {
+      PP.Diag(Tok.getLocation(), diag::warn_pragma_extra_tokens_at_eol)
+          << "overflowCheck";
+      PP.DiscardUntilEndOfDirective();
+      return;
+    }
+
+    MutableArrayRef<Token> Toks(
+        PP.getPreprocessorAllocator().Allocate<Token>(1), 1);
+    Toks[0].startToken();
+    Toks[0].setKind(tok::annot_pragma_overflowcheck);
+    Toks[0].setLocation(FirstToken.getLocation());
+    Toks[0].setAnnotationEndLoc(FirstToken.getLocation());
+    Toks[0].setAnnotationValue(nullptr);
+    PP.EnterTokenStream(Toks, /*DisableMacroExpansion=*/true,
+                        /*IsReinject=*/false);
+  }
+};
+
 struct PragmaAlignHandler : public PragmaHandler {
   explicit PragmaAlignHandler() : PragmaHandler("align") {}
   void HandlePragma(Preprocessor &PP, PragmaIntroducer Introducer,
@@ -420,6 +446,9 @@ void markAsReinjectedForRelexing(llvm::MutableArrayRef<clang::Token> Toks) {
 }  // end namespace
 
 void Parser::initializePragmaHandlers() {
+  OverflowCheckHandler = std::make_unique<PragmaOverflowCheckHandler>();
+  PP.AddPragmaHandler(OverflowCheckHandler.get());
+
   AlignHandler = std::make_unique<PragmaAlignHandler>();
   PP.AddPragmaHandler(AlignHandler.get());
 
@@ -579,6 +608,9 @@ void Parser::initializePragmaHandlers() {
 }
 
 void Parser::resetPragmaHandlers() {
+  PP.RemovePragmaHandler(OverflowCheckHandler.get());
+  OverflowCheckHandler.reset();
+
   // Remove the pragma handlers we installed.
   PP.RemovePragmaHandler(AlignHandler.get());
   AlignHandler.reset();

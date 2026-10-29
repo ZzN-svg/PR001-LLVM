@@ -7098,6 +7098,7 @@ public:
   ///@{
 
 private:
+  std::unique_ptr<PragmaHandler> OverflowCheckHandler;
   std::unique_ptr<PragmaHandler> AlignHandler;
   std::unique_ptr<PragmaHandler> GCCVisibilityHandler;
   std::unique_ptr<PragmaHandler> OptionsHandler;
@@ -7153,6 +7154,9 @@ private:
 
   /// Destroy and reset all pragma handlers.
   void resetPragmaHandlers();
+
+  /// Consume the annotation for #pragma overflowCheck.
+  void HandlePragmaOverflowCheck();
 
   /// Handle the annotation token produced for #pragma unused(...)
   ///

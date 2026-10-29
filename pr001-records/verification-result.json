@@ -1,0 +1,637 @@
+{
+  "overall": "PASS",
+  "counts": {
+    "PASS": 33,
+    "FAIL": 0
+  },
+  "clang": "$SOURCE/build/bin/clang-24",
+  "plugin": "$SOURCE/build/lib/TraverseFunctionDecls.so",
+  "results": [
+    {
+      "name": "clang-version",
+      "command": [
+        "$SOURCE/build/bin/clang-24",
+        "--version"
+      ],
+      "exit_code": 0,
+      "status": "PASS"
+    },
+    {
+      "name": "no-pragma",
+      "command": [
+        "$SOURCE/build/bin/clang-24",
+        "-std=c11",
+        "-Xclang",
+        "-load",
+        "-Xclang",
+        "$SOURCE/build/lib/TraverseFunctionDecls.so",
+        "-Xclang",
+        "-plugin",
+        "-Xclang",
+        "traverse-fn-decls",
+        "-fsyntax-only",
+        "$TEST_RECORDS/no-pragma.c"
+      ],
+      "exit_code": 0,
+      "status": "PASS",
+      "expected_stdout": "foo1: 0\n"
+    },
+    {
+      "name": "single-definition",
+      "command": [
+        "$SOURCE/build/bin/clang-24",
+        "-std=c11",
+        "-Xclang",
+        "-load",
+        "-Xclang",
+        "$SOURCE/build/lib/TraverseFunctionDecls.so",
+        "-Xclang",
+        "-plugin",
+        "-Xclang",
+        "traverse-fn-decls",
+        "-fsyntax-only",
+        "$TEST_RECORDS/single-definition.c"
+      ],
+      "exit_code": 0,
+      "status": "PASS",
+      "expected_stdout": "foo1: 1\nfoo2: 0\n"
+    },
+    {
+      "name": "declaration-does-not-consume",
+      "command": [
+        "$SOURCE/build/bin/clang-24",
+        "-std=c11",
+        "-Xclang",
+        "-load",
+        "-Xclang",
+        "$SOURCE/build/lib/TraverseFunctionDecls.so",
+        "-Xclang",
+        "-plugin",
+        "-Xclang",
+        "traverse-fn-decls",
+        "-fsyntax-only",
+        "$TEST_RECORDS/declaration-does-not-consume.c"
+      ],
+      "exit_code": 0,
+      "status": "PASS",
+      "expected_stdout": "foo1: 0\nfoo2: 1\nfoo3: 0\n"
+    },
+    {
+      "name": "prototype-and-definition",
+      "command": [
+        "$SOURCE/build/bin/clang-24",
+        "-std=c11",
+        "-Xclang",
+        "-load",
+        "-Xclang",
+        "$SOURCE/build/lib/TraverseFunctionDecls.so",
+        "-Xclang",
+        "-plugin",
+        "-Xclang",
+        "traverse-fn-decls",
+        "-fsyntax-only",
+        "$TEST_RECORDS/prototype-and-definition.c"
+      ],
+      "exit_code": 0,
+      "status": "PASS",
+      "expected_stdout": "foo1: 1\nfoo2: 0\n"
+    },
+    {
+      "name": "intervening-declarations",
+      "command": [
+        "$SOURCE/build/bin/clang-24",
+        "-std=c11",
+        "-Xclang",
+        "-load",
+        "-Xclang",
+        "$SOURCE/build/lib/TraverseFunctionDecls.so",
+        "-Xclang",
+        "-plugin",
+        "-Xclang",
+        "traverse-fn-decls",
+        "-fsyntax-only",
+        "$TEST_RECORDS/intervening-declarations.c"
+      ],
+      "exit_code": 0,
+      "status": "PASS",
+      "expected_stdout": "next: 0\nprototype: 0\nselected: 1\n"
+    },
+    {
+      "name": "independent-pragmas",
+      "command": [
+        "$SOURCE/build/bin/clang-24",
+        "-std=c11",
+        "-Xclang",
+        "-load",
+        "-Xclang",
+        "$SOURCE/build/lib/TraverseFunctionDecls.so",
+        "-Xclang",
+        "-plugin",
+        "-Xclang",
+        "traverse-fn-decls",
+        "-fsyntax-only",
+        "$TEST_RECORDS/independent-pragmas.c"
+      ],
+      "exit_code": 0,
+      "status": "PASS",
+      "expected_stdout": "a: 1\nb: 0\nc: 1\nd: 0\n"
+    },
+    {
+      "name": "consecutive-pragmas",
+      "command": [
+        "$SOURCE/build/bin/clang-24",
+        "-std=c11",
+        "-Xclang",
+        "-load",
+        "-Xclang",
+        "$SOURCE/build/lib/TraverseFunctionDecls.so",
+        "-Xclang",
+        "-plugin",
+        "-Xclang",
+        "traverse-fn-decls",
+        "-fsyntax-only",
+        "$TEST_RECORDS/consecutive-pragmas.c"
+      ],
+      "exit_code": 0,
+      "status": "PASS",
+      "expected_stdout": "next: 0\nselected: 1\n"
+    },
+    {
+      "name": "pragma-at-eof-no-newline",
+      "command": [
+        "$SOURCE/build/bin/clang-24",
+        "-std=c11",
+        "-Xclang",
+        "-load",
+        "-Xclang",
+        "$SOURCE/build/lib/TraverseFunctionDecls.so",
+        "-Xclang",
+        "-plugin",
+        "-Xclang",
+        "traverse-fn-decls",
+        "-fsyntax-only",
+        "$TEST_RECORDS/pragma-at-eof-no-newline.c"
+      ],
+      "exit_code": 0,
+      "status": "PASS",
+      "expected_stdout": ""
+    },
+    {
+      "name": "pragma-at-eof-after-definition",
+      "command": [
+        "$SOURCE/build/bin/clang-24",
+        "-std=c11",
+        "-Xclang",
+        "-load",
+        "-Xclang",
+        "$SOURCE/build/lib/TraverseFunctionDecls.so",
+        "-Xclang",
+        "-plugin",
+        "-Xclang",
+        "traverse-fn-decls",
+        "-fsyntax-only",
+        "$TEST_RECORDS/pragma-at-eof-after-definition.c"
+      ],
+      "exit_code": 0,
+      "status": "PASS",
+      "expected_stdout": "earlier: 0\n"
+    },
+    {
+      "name": "trailing-comment-and-blank-lines",
+      "command": [
+        "$SOURCE/build/bin/clang-24",
+        "-std=c11",
+        "-Xclang",
+        "-load",
+        "-Xclang",
+        "$SOURCE/build/lib/TraverseFunctionDecls.so",
+        "-Xclang",
+        "-plugin",
+        "-Xclang",
+        "traverse-fn-decls",
+        "-fsyntax-only",
+        "$TEST_RECORDS/trailing-comment-and-blank-lines.c"
+      ],
+      "exit_code": 0,
+      "status": "PASS",
+      "expected_stdout": "next: 0\nselected: 1\n"
+    },
+    {
+      "name": "multiline-comment",
+      "command": [
+        "$SOURCE/build/bin/clang-24",
+        "-std=c11",
+        "-Xclang",
+        "-load",
+        "-Xclang",
+        "$SOURCE/build/lib/TraverseFunctionDecls.so",
+        "-Xclang",
+        "-plugin",
+        "-Xclang",
+        "traverse-fn-decls",
+        "-fsyntax-only",
+        "$TEST_RECORDS/multiline-comment.c"
+      ],
+      "exit_code": 0,
+      "status": "PASS",
+      "expected_stdout": "selected: 1\n"
+    },
+    {
+      "name": "invalid-extra-tokens",
+      "command": [
+        "$SOURCE/build/bin/clang-24",
+        "-std=c11",
+        "-Xclang",
+        "-load",
+        "-Xclang",
+        "$SOURCE/build/lib/TraverseFunctionDecls.so",
+        "-Xclang",
+        "-plugin",
+        "-Xclang",
+        "traverse-fn-decls",
+        "-fsyntax-only",
+        "$TEST_RECORDS/invalid-extra-tokens.c"
+      ],
+      "exit_code": 0,
+      "status": "PASS",
+      "expected_stdout": "first: 0\nnext: 0\n"
+    },
+    {
+      "name": "case-sensitive",
+      "command": [
+        "$SOURCE/build/bin/clang-24",
+        "-std=c11",
+        "-Xclang",
+        "-load",
+        "-Xclang",
+        "$SOURCE/build/lib/TraverseFunctionDecls.so",
+        "-Xclang",
+        "-plugin",
+        "-Xclang",
+        "traverse-fn-decls",
+        "-fsyntax-only",
+        "$TEST_RECORDS/case-sensitive.c"
+      ],
+      "exit_code": 0,
+      "status": "PASS",
+      "expected_stdout": "plain: 0\n"
+    },
+    {
+      "name": "same-name-macro",
+      "command": [
+        "$SOURCE/build/bin/clang-24",
+        "-std=c11",
+        "-Xclang",
+        "-load",
+        "-Xclang",
+        "$SOURCE/build/lib/TraverseFunctionDecls.so",
+        "-Xclang",
+        "-plugin",
+        "-Xclang",
+        "traverse-fn-decls",
+        "-fsyntax-only",
+        "$TEST_RECORDS/same-name-macro.c"
+      ],
+      "exit_code": 0,
+      "status": "PASS",
+      "expected_stdout": "next: 0\nselected: 1\n"
+    },
+    {
+      "name": "pragma-operator",
+      "command": [
+        "$SOURCE/build/bin/clang-24",
+        "-std=c11",
+        "-Xclang",
+        "-load",
+        "-Xclang",
+        "$SOURCE/build/lib/TraverseFunctionDecls.so",
+        "-Xclang",
+        "-plugin",
+        "-Xclang",
+        "traverse-fn-decls",
+        "-fsyntax-only",
+        "$TEST_RECORDS/pragma-operator.c"
+      ],
+      "exit_code": 0,
+      "status": "PASS",
+      "expected_stdout": "next: 0\nselected: 1\n"
+    },
+    {
+      "name": "macro-pragma-operator",
+      "command": [
+        "$SOURCE/build/bin/clang-24",
+        "-std=c11",
+        "-Xclang",
+        "-load",
+        "-Xclang",
+        "$SOURCE/build/lib/TraverseFunctionDecls.so",
+        "-Xclang",
+        "-plugin",
+        "-Xclang",
+        "traverse-fn-decls",
+        "-fsyntax-only",
+        "$TEST_RECORDS/macro-pragma-operator.c"
+      ],
+      "exit_code": 0,
+      "status": "PASS",
+      "expected_stdout": "next: 0\nselected: 1\n"
+    },
+    {
+      "name": "inactive-directive",
+      "command": [
+        "$SOURCE/build/bin/clang-24",
+        "-std=c11",
+        "-Xclang",
+        "-load",
+        "-Xclang",
+        "$SOURCE/build/lib/TraverseFunctionDecls.so",
+        "-Xclang",
+        "-plugin",
+        "-Xclang",
+        "traverse-fn-decls",
+        "-fsyntax-only",
+        "$TEST_RECORDS/inactive-directive.c"
+      ],
+      "exit_code": 0,
+      "status": "PASS",
+      "expected_stdout": "plain: 0\n"
+    },
+    {
+      "name": "later-prototype-preserves-definition",
+      "command": [
+        "$SOURCE/build/bin/clang-24",
+        "-std=c11",
+        "-Xclang",
+        "-load",
+        "-Xclang",
+        "$SOURCE/build/lib/TraverseFunctionDecls.so",
+        "-Xclang",
+        "-plugin",
+        "-Xclang",
+        "traverse-fn-decls",
+        "-fsyntax-only",
+        "$TEST_RECORDS/later-prototype-preserves-definition.c"
+      ],
+      "exit_code": 0,
+      "status": "PASS",
+      "expected_stdout": "next: 0\nselected: 1\n"
+    },
+    {
+      "name": "prototype-must-not-mark-earlier-definition",
+      "command": [
+        "$SOURCE/build/bin/clang-24",
+        "-std=c11",
+        "-Xclang",
+        "-load",
+        "-Xclang",
+        "$SOURCE/build/lib/TraverseFunctionDecls.so",
+        "-Xclang",
+        "-plugin",
+        "-Xclang",
+        "traverse-fn-decls",
+        "-fsyntax-only",
+        "$TEST_RECORDS/prototype-must-not-mark-earlier-definition.c"
+      ],
+      "exit_code": 0,
+      "status": "PASS",
+      "expected_stdout": "earlier: 0\nnext: 0\nselected: 1\n"
+    },
+    {
+      "name": "function-pointer-prototype",
+      "command": [
+        "$SOURCE/build/bin/clang-24",
+        "-std=c11",
+        "-Xclang",
+        "-load",
+        "-Xclang",
+        "$SOURCE/build/lib/TraverseFunctionDecls.so",
+        "-Xclang",
+        "-plugin",
+        "-Xclang",
+        "traverse-fn-decls",
+        "-fsyntax-only",
+        "$TEST_RECORDS/function-pointer-prototype.c"
+      ],
+      "exit_code": 0,
+      "status": "PASS",
+      "expected_stdout": "factory: 0\nnext: 0\nselected: 1\n"
+    },
+    {
+      "name": "static-inline-definition",
+      "command": [
+        "$SOURCE/build/bin/clang-24",
+        "-std=c11",
+        "-Xclang",
+        "-load",
+        "-Xclang",
+        "$SOURCE/build/lib/TraverseFunctionDecls.so",
+        "-Xclang",
+        "-plugin",
+        "-Xclang",
+        "traverse-fn-decls",
+        "-fsyntax-only",
+        "$TEST_RECORDS/static-inline-definition.c"
+      ],
+      "exit_code": 0,
+      "status": "PASS",
+      "expected_stdout": "next: 0\nselected: 1\n"
+    },
+    {
+      "name": "empty-declarations",
+      "command": [
+        "$SOURCE/build/bin/clang-24",
+        "-std=c11",
+        "-Xclang",
+        "-load",
+        "-Xclang",
+        "$SOURCE/build/lib/TraverseFunctionDecls.so",
+        "-Xclang",
+        "-plugin",
+        "-Xclang",
+        "traverse-fn-decls",
+        "-fsyntax-only",
+        "$TEST_RECORDS/empty-declarations.c"
+      ],
+      "exit_code": 0,
+      "status": "PASS",
+      "expected_stdout": "next: 0\nprototype: 0\nselected: 1\n"
+    },
+    {
+      "name": "existing-pack-pragma",
+      "command": [
+        "$SOURCE/build/bin/clang-24",
+        "-std=c11",
+        "-Xclang",
+        "-load",
+        "-Xclang",
+        "$SOURCE/build/lib/TraverseFunctionDecls.so",
+        "-Xclang",
+        "-plugin",
+        "-Xclang",
+        "traverse-fn-decls",
+        "-fsyntax-only",
+        "$TEST_RECORDS/existing-pack-pragma.c"
+      ],
+      "exit_code": 0,
+      "status": "PASS",
+      "expected_stdout": "next: 0\nselected: 1\n"
+    },
+    {
+      "name": "other-pragmas-do-not-consume",
+      "command": [
+        "$SOURCE/build/bin/clang-24",
+        "-std=c11",
+        "-Xclang",
+        "-load",
+        "-Xclang",
+        "$SOURCE/build/lib/TraverseFunctionDecls.so",
+        "-Xclang",
+        "-plugin",
+        "-Xclang",
+        "traverse-fn-decls",
+        "-fsyntax-only",
+        "$TEST_RECORDS/other-pragmas-do-not-consume.c"
+      ],
+      "exit_code": 0,
+      "status": "PASS",
+      "expected_stdout": "next: 0\nselected: 1\n"
+    },
+    {
+      "name": "include-prototype",
+      "command": [
+        "$SOURCE/build/bin/clang-24",
+        "-std=c11",
+        "-Xclang",
+        "-load",
+        "-Xclang",
+        "$SOURCE/build/lib/TraverseFunctionDecls.so",
+        "-Xclang",
+        "-plugin",
+        "-Xclang",
+        "traverse-fn-decls",
+        "-fsyntax-only",
+        "$TEST_RECORDS/include-prototype.c"
+      ],
+      "exit_code": 0,
+      "status": "PASS",
+      "expected_stdout": "header_decl: 0\nnext: 0\nselected: 1\n"
+    },
+    {
+      "name": "include-definition",
+      "command": [
+        "$SOURCE/build/bin/clang-24",
+        "-std=c11",
+        "-Xclang",
+        "-load",
+        "-Xclang",
+        "$SOURCE/build/lib/TraverseFunctionDecls.so",
+        "-Xclang",
+        "-plugin",
+        "-Xclang",
+        "traverse-fn-decls",
+        "-fsyntax-only",
+        "$TEST_RECORDS/include-definition.c"
+      ],
+      "exit_code": 0,
+      "status": "PASS",
+      "expected_stdout": "header_definition: 1\nnext: 0\n"
+    },
+    {
+      "name": "pragma-from-include",
+      "command": [
+        "$SOURCE/build/bin/clang-24",
+        "-std=c11",
+        "-Xclang",
+        "-load",
+        "-Xclang",
+        "$SOURCE/build/lib/TraverseFunctionDecls.so",
+        "-Xclang",
+        "-plugin",
+        "-Xclang",
+        "traverse-fn-decls",
+        "-fsyntax-only",
+        "$TEST_RECORDS/pragma-from-include.c"
+      ],
+      "exit_code": 0,
+      "status": "PASS",
+      "expected_stdout": "header_decl: 0\nnext: 0\nselected: 1\n"
+    },
+    {
+      "name": "declaration-only-at-eof",
+      "command": [
+        "$SOURCE/build/bin/clang-24",
+        "-std=c11",
+        "-Xclang",
+        "-load",
+        "-Xclang",
+        "$SOURCE/build/lib/TraverseFunctionDecls.so",
+        "-Xclang",
+        "-plugin",
+        "-Xclang",
+        "traverse-fn-decls",
+        "-fsyntax-only",
+        "$TEST_RECORDS/declaration-only-at-eof.c"
+      ],
+      "exit_code": 0,
+      "status": "PASS",
+      "expected_stdout": "only_declared: 0\n"
+    },
+    {
+      "name": "empty-translation-unit",
+      "command": [
+        "$SOURCE/build/bin/clang-24",
+        "-std=c11",
+        "-Xclang",
+        "-load",
+        "-Xclang",
+        "$SOURCE/build/lib/TraverseFunctionDecls.so",
+        "-Xclang",
+        "-plugin",
+        "-Xclang",
+        "traverse-fn-decls",
+        "-fsyntax-only",
+        "$TEST_RECORDS/empty-translation-unit.c"
+      ],
+      "exit_code": 0,
+      "status": "PASS",
+      "expected_stdout": ""
+    },
+    {
+      "name": "normal-pragma-syntax",
+      "command": [
+        "$SOURCE/build/bin/clang-24",
+        "-std=c11",
+        "-fsyntax-only",
+        "$TEST_RECORDS/single-definition.c"
+      ],
+      "exit_code": 0,
+      "status": "PASS"
+    },
+    {
+      "name": "ordinary-ast-with-pragma",
+      "command": [
+        "$SOURCE/build/bin/clang-24",
+        "-std=c11",
+        "-Xclang",
+        "-ast-dump",
+        "-fsyntax-only",
+        "$TEST_RECORDS/single-definition.c"
+      ],
+      "exit_code": 0,
+      "status": "PASS"
+    },
+    {
+      "name": "normal-pragma-code-generation",
+      "command": [
+        "$SOURCE/build/bin/clang-24",
+        "-std=c11",
+        "-c",
+        "$TEST_RECORDS/single-definition.c",
+        "-o",
+        "$TEST_RECORDS/pragma.o"
+      ],
+      "exit_code": 0,
+      "status": "PASS"
+    }
+  ]
+}

@@ -1,0 +1,16 @@
+{
+  "clang/include/clang/Parse/Parser.h": "34b6fa87cff80e2b19d4f17baa65baa60e404f4785a23402ac6afc97b5d233f2",
+  "clang/lib/Parse/ParsePragma.cpp": "2751044aa06ebc46b0b3764a78bec7c27e37bfc702f5d6531931f61534689a28",
+  "clang/include/clang/Basic/TokenKinds.def": "173b5ab0500162e4a443b1735d2095f1bc84e7c43aec17f8664b8ccc98521c25",
+  "clang/lib/Parse/Parser.cpp": "07d8139bf311d3013aeba45b7d5a47ee01f12f9eafe91b01cfe98d4608337ad1",
+  "clang/include/clang/Sema/Sema.h": "b5f01879bc5118d37ede44c2fbe9051e4d857bb1724dbce80e051dba5517228b",
+  "clang/lib/Sema/SemaAttr.cpp": "dd5f3c8fb1ad2e20c823d76c348e18372ea896a1ae0a93842b2031aa0bff96d0",
+  "clang/lib/Sema/SemaDecl.cpp": "3dee1b75edd5f55b4713ab5b20bd7847da560ba87051d9e88ea9822f74c32171",
+  "clang/include/clang/AST/Decl.h": "2fdadd91ffdce317f2b15bf4a7ccc950bed1352d10ce3be75268bf63d73ca511",
+  "clang/examples/CMakeLists.txt": "1930ddd385d4f51c4c53e6b2edcc86f3d440615ab7236b54677e2833f129abd9",
+  "clang/examples/TraverseFunctionDecls/CMakeLists.txt": "64e6558c47fdcaa74f210fc437b72bce628ea5088193dbb3c8661b6d899f70c3",
+  "clang/examples/TraverseFunctionDecls/TraverseFunctionDecls.cpp": "398f149d4d45d8113243203fcac4501c75ab99cbe3f94c8ade0e7cc8d27b907b",
+  "README-PR001.md": "89f4a3642a992fd63d6b92285d3fc085c41e8e693c9a3407605a85cc1fb234d0",
+  "pr001-tests/verify.py": "e3097015afb48cd4c394b261871e7f997a8e9d02515f9dcc437d10cf184ebe31",
+  "pr001-tests/example.c": "32ba652b683a6891d30bfef9934ee2b45adc69b4efd4b88b8206389051b17494"
+}

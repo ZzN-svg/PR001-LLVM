@@ -22,6 +22,10 @@
 #include <optional>
 using namespace clang;
 
+void Sema::ActOnPragmaOverFlowCheck() {
+  OverflowCheckPragmaOn = true;
+}
+
 //===----------------------------------------------------------------------===//
 // Pragma 'pack' and 'options align'
 //===----------------------------------------------------------------------===//

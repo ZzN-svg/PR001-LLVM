@@ -764,6 +764,9 @@ ANNOTATION(pack_indexing_type) // annotation for an indexed pack of type,
 // one 'pragma_unused' annotation token followed by the argument token.
 PRAGMA_ANNOTATION(pragma_unused)
 
+// Annotation for #pragma overflowCheck.
+PRAGMA_ANNOTATION(pragma_overflowcheck)
+
 // Annotation for #pragma GCC visibility...
 // The lexer produces these so that they only take effect when the parser
 // handles them.

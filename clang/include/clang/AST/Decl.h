@@ -2184,6 +2184,9 @@ private:
 
   unsigned ODRHash;
 
+  /// Whether this definition is selected by #pragma overflowCheck.
+  bool IsOverflowCheck = false;
+
   /// End part of this FunctionDecl's source range.
   ///
   /// We could compute the full range in getSourceRange(). However, when we're
@@ -2288,6 +2291,9 @@ protected:
 public:
   friend class ASTDeclReader;
   friend class ASTDeclWriter;
+
+  void setOverflowCheck(bool Flag) { IsOverflowCheck = Flag; }
+  bool getOverflowCheck() const { return IsOverflowCheck; }
 
   using redecl_range = redeclarable_base::redecl_range;
   using redecl_iterator = redeclarable_base::redecl_iterator;

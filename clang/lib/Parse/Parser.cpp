@@ -725,6 +725,12 @@ bool Parser::ParseTopLevelDecl(DeclGroupPtrTy &Result,
   return false;
 }
 
+void Parser::HandlePragmaOverflowCheck() {
+  assert(Tok.is(tok::annot_pragma_overflowcheck));
+  Actions.ActOnPragmaOverFlowCheck();
+  ConsumeAnnotationToken();
+}
+
 Parser::DeclGroupPtrTy
 Parser::ParseExternalDeclaration(ParsedAttributes &Attrs,
                                  ParsedAttributes &DeclSpecAttrs,
@@ -739,6 +745,9 @@ Parser::ParseExternalDeclaration(ParsedAttributes &Attrs,
 
   Decl *SingleDecl = nullptr;
   switch (Tok.getKind()) {
+  case tok::annot_pragma_overflowcheck:
+    HandlePragmaOverflowCheck();
+    return nullptr;
   case tok::annot_pragma_vis:
     HandlePragmaVisibility();
     return nullptr;

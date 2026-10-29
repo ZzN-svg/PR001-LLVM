@@ -1,0 +1,40 @@
+[
+  {
+    "stage": "configure",
+    "command": [
+      "cmake",
+      "-S",
+      "$SOURCE/llvm",
+      "-B",
+      "$SOURCE/build",
+      "-G",
+      "Unix Makefiles",
+      "-DCMAKE_BUILD_TYPE=Release",
+      "-DLLVM_ENABLE_PROJECTS=clang",
+      "-DLLVM_TARGETS_TO_BUILD=X86",
+      "-DLLVM_BUILD_EXAMPLES=ON",
+      "-DCLANG_BUILD_EXAMPLES=ON",
+      "-DLLVM_ENABLE_ASSERTIONS=ON",
+      "-DLLVM_ENABLE_RTTI=OFF",
+      "-DLLVM_ENABLE_EH=OFF",
+      "-DCMAKE_INSTALL_PREFIX=$INSTALL_PREFIX"
+    ],
+    "exit_code": 0,
+    "seconds": 16.656680905725807
+  },
+  {
+    "stage": "compile-clang-and-plugin",
+    "command": [
+      "cmake",
+      "--build",
+      "$SOURCE/build",
+      "--target",
+      "clang",
+      "TraverseFunctionDecls",
+      "--",
+      "-j2"
+    ],
+    "exit_code": 0,
+    "seconds": 4407.125265493989
+  }
+]
